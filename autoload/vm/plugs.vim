@@ -41,7 +41,7 @@ endfun
 
 fun! vm#plugs#buffer() abort
   " Plugs and mappings for <buffer> keys.
-  let g:Vm.motions        = ['h', 'j', 'k', 'l', 'w', 'W', 'b', 'B', 'e', 'E', ',', ';', '$', '0', '^', '%', 'ge', 'gE', '\|']
+  let g:Vm.motions        = ['h', 'j', 'k', 'l', 'w', 'W', 'b', 'B', 'e', 'E', ',', ';', '$', '0', '^', '_', '%', 'ge', 'gE', '\|']
   let g:Vm.find_motions   = ['f', 'F', 't', 'T']
   let g:Vm.tobj_motions   = { '{': '{', '}': '}', '(': '(', ')': ')', 'g{': '[{', 'g}': ']}', 'g)': '])', 'g(': '[(' }
 

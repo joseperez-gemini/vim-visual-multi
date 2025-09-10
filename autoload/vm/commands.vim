@@ -936,7 +936,7 @@ let s:R                = { -> s:V.Regions      }
 let s:is_r             = { -> g:Vm.buffer && !empty(s:G.region_at_pos()) }
 let s:first_line       = { -> line('.') == 1 }
 let s:last_line        = { -> line('.') == line('$') }
-let s:symbol           = {   -> index(['^', '0', '%', '$'],     s:v.motion) >= 0 }
+let s:symbol           = {   -> index(['^', '_', '0', '%', '$'],     s:v.motion) >= 0 }
 let s:horizontal       = {   -> index(['h', 'l'],               s:v.motion) >= 0 }
 let s:vertical         = {   -> index(['j', 'k'],               s:v.motion) >= 0 }
 let s:simple           = { m -> index(split('hlwebWEB', '\zs'), m)          >= 0 }

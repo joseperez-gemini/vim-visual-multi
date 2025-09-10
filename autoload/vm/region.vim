@@ -246,6 +246,11 @@ endfun
 fun! s:Region.move(...) abort
     " Move cursors, or extend regions by motion.
     let s:motion = a:0? a:1 : s:v.motion
+    
+    " Map '_' to '^' for beginning of line
+    if s:motion == '_'
+        let s:motion = '^'
+    endif
 
     if !s:X()
         call s:move_cursor(self)
