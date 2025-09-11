@@ -79,7 +79,7 @@ fun! vm#plugs#buffer() abort
   nnoremap <silent>       <Plug>(VM-Filter-Lines-Strip)      :call vm#special#commands#filter_lines(1)<cr>
   nnoremap <silent>       <Plug>(VM-Merge-Regions)           :call b:VM_Selection.Global.merge_regions()<cr>
   nnoremap <silent>       <Plug>(VM-Switch-Mode)             :call b:VM_Selection.Global.change_mode(1)<cr>
-  nnoremap <silent>       <Plug>(VM-Exit)                    :<c-u><C-r>=b:VM_Selection.Vars.noh<CR>call vm#reset()<cr>
+  nnoremap <silent>       <Plug>(VM-Exit)                    :<c-u><C-r>=b:VM_Selection.Vars.noh<CR>call vm#plugs#exit()<cr>
   nnoremap <silent>       <Plug>(VM-Undo)                    :call vm#commands#undo()<cr>
   nnoremap <silent>       <Plug>(VM-Redo)                    :call vm#commands#redo()<cr>
 
@@ -260,6 +260,15 @@ fun! s:O(upper)
     call vm#commands#invert_direction(1)
   else
     call b:VM_Selection.Insert.key(a:upper ? 'O' : 'o')
+  endif
+endfun
+
+fun! vm#plugs#exit() abort
+  " Smart exit: if in extend mode, switch back to cursor mode; otherwise exit VM
+  if g:Vm.extend_mode
+    call b:VM_Selection.Global.change_mode(1)
+  else
+    call vm#reset()
   endif
 endfun
 
