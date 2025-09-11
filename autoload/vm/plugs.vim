@@ -167,10 +167,10 @@ fun! vm#plugs#buffer() abort
   nnoremap <silent>        <Plug>(VM-gDecrease)               :<C-u>call vm#commands#increase_or_decrease(0, 0, v:count1, v:true)<cr>
   nnoremap <silent>        <Plug>(VM-Alpha-Increase)          :<C-u>call vm#commands#increase_or_decrease(1, 1, v:count1, v:false)<cr>
   nnoremap <silent>        <Plug>(VM-Alpha-Decrease)          :<C-u>call vm#commands#increase_or_decrease(0, 1, v:count1, v:false)<cr>
-  nnoremap <silent>        <Plug>(VM-a)                       :<C-u>call b:VM_Selection.Insert.key('a')<cr>
-  nnoremap <silent>        <Plug>(VM-A)                       :<C-u>call b:VM_Selection.Insert.key('A')<cr>
-  nnoremap <silent>        <Plug>(VM-i)                       :<C-u>call b:VM_Selection.Insert.key('i')<cr>
-  nnoremap <silent>        <Plug>(VM-I)                       :<C-u>call b:VM_Selection.Insert.key('I')<cr>
+  nnoremap <silent>        <Plug>(VM-a)                       :<C-u>call vm#plugs#text_object('a')<cr>
+  nnoremap <silent>        <Plug>(VM-A)                       :<C-u>call b:VM_Selection.Insert.key('a')<cr>
+  nnoremap <silent>        <Plug>(VM-i)                       :<C-u>call vm#plugs#text_object('i')<cr>
+  nnoremap <silent>        <Plug>(VM-I)                       :<C-u>call b:VM_Selection.Insert.key('i')<cr>
   nnoremap <silent>        <Plug>(VM-o)                       :<C-u>call <sid>O(0)<cr>
   nnoremap <silent>        <Plug>(VM-O)                       :<C-u>call <sid>O(1)<cr>
   nnoremap <silent>        <Plug>(VM-c)                       :<C-u>call b:VM_Selection.Edit.change(g:Vm.extend_mode, v:count1, v:register, 0)<cr>
@@ -269,6 +269,40 @@ fun! vm#plugs#exit() abort
     call b:VM_Selection.Global.change_mode(1)
   else
     call vm#reset()
+  endif
+endfun
+
+fun! vm#plugs#text_object(prefix) abort
+  " Handle i/a text objects in extend mode, fallback to insert/append in cursor mode
+  if !g:Vm.extend_mode
+    " Not in extend mode, use insert/append behavior
+    call b:VM_Selection.Insert.key(a:prefix)
+    return
+  endif
+
+  " In extend mode, wait for text object
+  echo a:prefix
+  let c = getchar()
+
+  if c == 27  " Esc key
+    echo "\r"
+    return
+  endif
+
+  let char = nr2char(c)
+
+  " Check if it's a valid text object character
+  " Use the same logic as the select operator
+  let s:single = { c -> index(split('hljkwebWEB$^0{}()%nN', '\zs'), c) >= 0 }
+  let s:double = { c -> index(split('iafFtTg', '\zs'), c) >= 0              }
+
+  if s:single(char) || (len(a:prefix . char) == 2)
+    echo char
+    " Use the select operator with the text object
+    call vm#operators#select(1, a:prefix . char)
+  else
+    " Not a valid text object, just cancel
+    echo "\r"
   endif
 endfun
 
