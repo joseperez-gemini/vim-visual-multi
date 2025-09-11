@@ -306,11 +306,31 @@ fun! vm#commands#find_all(visual, whole) abort
     let s:v.eco = 1
 
     if !a:visual
-        let R = s:G.region_at_pos()
-        if empty(R)
-            let R = vm#commands#find_under(0, a:whole)
+        " Check if search highlighting is active and there's a search pattern
+        " Use the backed-up search if @/ is empty (VM clears it)
+        let search_pat = !empty(@/) ? @/ : get(s:v, 'oldsearch', [''])[0]
+
+        if v:hlsearch && !empty(search_pat)
+            " Use the current/backed-up search pattern
+            call s:Search.get_slash_reg(search_pat)
+            " Create a dummy region to trigger the search
+            call cursor(pos[0], pos[1])
+            if search(search_pat, 'c')
+                silent keepjumps normal! ygn
+                let R = s:G.new_region()
+            else
+                " No match found, fall back to word under cursor
+                let R = vm#commands#find_under(0, a:whole)
+                call s:Search.update_patterns(R.pat)
+            endif
+        else
+            " Original behavior: find word under cursor
+            let R = s:G.region_at_pos()
+            if empty(R)
+                let R = vm#commands#find_under(0, a:whole)
+            endif
+            call s:Search.update_patterns(R.pat)
         endif
-        call s:Search.update_patterns(R.pat)
     else
         let R = vm#commands#find_under(1, a:whole)
     endif
