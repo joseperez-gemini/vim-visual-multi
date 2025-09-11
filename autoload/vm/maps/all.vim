@@ -23,6 +23,7 @@ let s:base = {
       \"Visual Add":              ['', 'x'],
       \"Visual Find":             ['', 'x'],
       \"Visual Cursors":          ['', 'x'],
+      \"Visual Find In Selection": ['', 'x'],
       \"Find Under":              ['', 'n'],
       \"Find Subword Under":      ['', 'x'],
       \"Select Cursor Down":      ['', 'n'],

@@ -19,6 +19,7 @@ fun! vm#plugs#permanent() abort
   xnoremap <silent>       <Plug>(VM-Visual-Cursors)          <Esc>:call vm#commands#visual_cursors()<cr>
   xnoremap <silent>       <Plug>(VM-Visual-Add)              <Esc>:call vm#commands#visual_add()<cr>
   xnoremap <silent>       <Plug>(VM-Visual-Reduce)           :<c-u>call vm#visual#reduce()<cr>
+  xnoremap <silent>       <Plug>(VM-Visual-Find-In-Selection) :<c-u>call vm#commands#visual_find_in_selection()<cr>
 
   nnoremap <silent>       <Plug>(VM-Find-Under)              :<c-u>call vm#commands#ctrln(v:count1)<cr>
   xnoremap <silent><expr> <Plug>(VM-Find-Subword-Under)      <sid>Visual('under')

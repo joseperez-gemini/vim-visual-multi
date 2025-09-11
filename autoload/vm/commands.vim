@@ -814,6 +814,13 @@ fun! vm#commands#visual_add() abort
 endfun
 
 
+fun! vm#commands#visual_find_in_selection() abort
+    " Find search pattern matches within visual selection.
+    call s:set_extend_mode(1)
+    call vm#visual#find_in_selection()
+endfun
+
+
 fun! vm#commands#remove_every_n_regions(count) abort
     " Remove every n regions, given by [count], min 2.
     if s:F.no_regions() | return | endif

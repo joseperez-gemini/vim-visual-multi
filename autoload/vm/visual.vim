@@ -1,11 +1,10 @@
-"commands to add/subtract regions with visual selection
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Add / Subtract
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 fun! vm#visual#add(mode) abort
-    " Add visually selected region to current regions.
-    call s:backup_map()
-    let pos = getpos('.')[1:2]
-
+    " Add visually selected pattern as region
+    call s:init()
     if a:mode ==# 'v'     | call s:vchar()
     elseif a:mode ==# 'V' | call s:vline()
     else                  | let s:v.direction = s:vblock(1)
@@ -14,23 +13,26 @@ fun! vm#visual#add(mode) abort
     call s:visual_merge()
 
     if a:mode ==# 'V'
-        call s:G.split_lines()
-        call s:G.remove_empty_lines()
-    elseif a:mode ==# 'v'
-        for r in s:R()
-            if r.h | let s:v.multiline = 1 | break | endif
-        endfor
+        if !g:VM_use_first_cursor_in_line
+            if s:v.silence
+                call s:G.select_region(len(s:R())-1)
+            endif
+        else
+            let ix = s:G.lines_with_regions(0, s:R()[-1].l)[s:R()[-1].l][0]
+            call s:G.select_region(ix)
+        endif
+    else
+        if s:v.silence
+            call s:G.select_region(len(s:R())-1)
+        endif
     endif
-
-    call s:G.update_and_select_region(pos)
 endfun
 
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 fun! vm#visual#subtract(mode) abort
-    " Subtract visually selected region from current regions.
-    let X = s:backup_map()
-
+    " Subtract a pattern from regions map.
+    call s:init()
     if a:mode ==# 'v'     | call s:vchar()
     elseif a:mode ==# 'V' | call s:vline()
     else                  | call s:vblock(1)
@@ -102,6 +104,104 @@ fun! vm#visual#split() abort
     call s:G.update_and_select_region()
 endfun
 
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+fun! vm#visual#find_in_selection() abort
+    " Find all occurrences of the current search pattern within visual selection.
+
+    " Get visual mode first (before any initialization)
+    let mode = visualmode()
+
+    call s:init()
+
+    " Get the current search pattern - use oldsearch backup if @/ is empty
+    let pat = empty(@/) ? get(s:v, 'oldsearch', [''])[0] : @/
+    if empty(pat)
+        call s:F.msg('No search pattern set. Use / to search first.')
+        return
+    endif
+
+    " For character-wise visual mode, find all occurrences in entire file
+    if mode ==# 'v'
+        " Use the current search pattern for the entire file
+        call s:V.Search.get_slash_reg(pat)
+        call s:G.get_all_regions()
+        call s:G.update_and_select_region()
+        return
+    endif
+
+    " Get visual selection boundaries
+    let [startline, startcol] = getpos("'<")[1:2]
+    let [endline, endcol] = getpos("'>")[1:2]
+
+    " Save current search pattern and use it
+    call s:V.Search.get_slash_reg(pat)
+
+    " Get all regions within the selection boundaries
+    call cursor(startline, 1)
+
+    " Check if there's at least one match in the selection
+    if !search(pat, 'nczW', endline)
+        call s:F.msg('Pattern not found in selection')
+        return
+    endif
+
+    " Find all matches within the selection
+    let [ows, ei] = [&wrapscan, &eventignore]
+    set nowrapscan eventignore=all
+
+    call cursor(startline, 1)
+
+    " Find first match
+    if search(pat, 'czW', endline)
+        silent keepjumps normal! ygn
+        let match_line = getpos("'[")[1]
+        if match_line >= startline && match_line <= endline
+            if mode ==# 'V' || (mode ==# 'v')
+                " For line-wise or character-wise, just check line boundaries
+                call s:G.new_region()
+            elseif mode == "\<C-v>"
+                " For block-wise, also check column boundaries
+                let match_col = getpos("'[")[2]
+                if match_col >= startcol && match_col <= endcol
+                    call s:G.new_region()
+                endif
+            endif
+        endif
+    endif
+
+    " Find remaining matches
+    while 1
+        if !search(pat, 'zW', endline)
+            break
+        endif
+        silent keepjumps normal! ygn
+        let match_line = getpos("'[")[1]
+
+        if match_line > endline
+            break
+        elseif match_line >= startline
+            if mode ==# 'V' || (mode ==# 'v')
+                call s:G.new_region()
+            elseif mode == "\<C-v>"
+                let match_col = getpos("'[")[2]
+                if match_col >= startcol && match_col <= endcol
+                    call s:G.new_region()
+                endif
+            endif
+        endif
+    endwhile
+
+    let &wrapscan = ows
+    let &eventignore = ei
+
+    if !len(s:R())
+        call s:F.msg('No matches found in selection')
+        return
+    endif
+
+    call s:G.update_and_select_region()
+endfun
 
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -117,8 +217,10 @@ endfun
 
 fun! s:vline() abort
     "linewise selection
-    silent keepjumps normal! '<y'>`]
-    call s:G.new_region()
+    let [line1, line2] = [getpos("'<")[1], getpos("'>")[1]]
+    for n in range(line1, line2)
+        call cursor(n, 1) | call s:G.new_region({'go_back': 1})
+    endfor
 endfun
 
 
@@ -128,83 +230,93 @@ fun! s:vblock(extend) abort
     let end = getpos("'>")[1:2]
 
     if ( start[1] > end[1] )
-        " swap columns because top-right or bottom-left corner is selected
-        let temp = start[1]
-        let start[1] = end[1]
-        let end[1] = temp
-        let inverted = line(".") == line("'>")
+        let s = end[1] | let e = start[1]
     else
-        let inverted = line(".") == line("'<")
+        let s = start[1] | let e = end[1]
     endif
 
-    let block_width = abs(virtcol("'>") - virtcol("'<"))
-
-    call s:create_cursors(start, end)
-
-    if a:extend && block_width
-        call vm#commands#motion('l', block_width, 1, 0)
+    if start == end
+        if a:extend
+            keepjumps normal! gvy
+            return s:G.new_region()
+        else | return | endif
     endif
-    return !inverted
+
+    for n in range(start[0], end[0])
+        call cursor(n, s)
+        if s:F.char_under_cursor() =~ '\v\S'
+            exe "keepjumps normal! \<C-v>".( e - s )."l"."y"
+            call s:G.new_region()
+        endif
+    endfor
+    return s:v.direction
 endfun
 
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+fun! s:create_cursors(start, end) abort
+    "create cursors at each line of visual selection, at the start column
+    "start, end are lists: [line, column]
+    let line = a:start[0]
+    let scol = a:start[1]
+    let ecol = a:end[1]
+    let change_col = scol == ecol
+
+    for n in range(line, a:end[0])
+        call cursor(n, scol)
+        if s:F.char_under_cursor() =~ '\v\S'
+            call vm#commands#add_cursor(change_col)
+        endif
+    endfor
+endfun
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+let s:R   = { -> s:V.Regions      }
+let s:v   = { -> b:VM_Selection.Vars }
+let s:X   = { -> g:Vm.extend_mode  }
+let s:Bytes = {}
+
+fun! s:init() abort
+    let s:V = b:VM_Selection | let s:v = s:V.Vars
+    let s:F = s:V.Funcs      | let s:G = s:V.Global
+endfun
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 fun! s:backup_map() abort
-    "use temporary regions, they will be merged later
-    call s:init()
-    let X = s:G.extend_mode()
-    let s:Bytes = copy(s:V.Bytes)
-    call s:G.erase_regions()
-    let s:v.no_search = 1
-    let s:v.eco = 1
+    "backup regions to merge, store X flag and return to cursor mode if active
+    for r in s:R()
+        let s:Bytes[r.id] = [r.A, r.B]
+    endfor
+    let X = s:X()
+    if X | call s:G.cursor_mode() | endif
     return X
 endfun
 
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 fun! s:visual_merge() abort
-    "merge regions
-    let new_map = copy(s:V.Bytes)
-    let s:V.Bytes = s:Bytes
-    call s:G.merge_maps(new_map)
-    unlet new_map
+    "merge regions and update the regions list
+    call s:G.merge_regions()
+    for r in s:R()
+        let s:Bytes[r.id] = [r.A, r.B]
+    endfor
+    call s:G.update_regions()
 endfun
 
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 fun! s:visual_subtract() abort
-    "subtract regions
-    let new_map = copy(s:V.Bytes)
-    let s:V.Bytes = s:Bytes
-    call s:G.subtract_maps(new_map)
-    unlet new_map
+    "subtract regions and rebuild from map
+    let X = s:X()
+    for r in s:R()
+        if has_key(s:Bytes, r.id)
+            unlet s:Bytes[r.id]
+        endif
+    endfor
+    call s:G.rebuild_from_map(s:Bytes)
+    if X | call s:G.cursor_mode() | endif
 endfun
 
-
-fun! s:init() abort
-    "init script vars
-    let s:V = b:VM_Selection
-    let s:v = s:V.Vars
-    let s:G = s:V.Global
-    let s:F = s:V.Funcs
-endfun
-
-
-fun! s:create_cursors(start, end) abort
-    "create cursors that span over visual selection
-    call cursor(a:start)
-
-    if ( a:end[0] > a:start[0] )
-        while line('.') < a:end[0]
-            call vm#commands#add_cursor_down(0, 1)
-        endwhile
-
-    elseif empty(s:G.region_at_pos())
-        " ensure there's at least a cursor
-        call s:G.new_cursor()
-    endif
-endfun
-
-
-let s:R = { -> s:V.Regions }
-let s:X = { -> g:Vm.extend_mode }
-
-
-" vim: et sw=4 ts=4 sts=4 fdm=indent fdn=1
+" vim: et ts=4 sw=4 sts=4 :
