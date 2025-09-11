@@ -336,6 +336,8 @@ fun! s:Insert.stop(...) abort
     " reset insert mode variables
     let s:v.eco    = 1
     let s:v.insert = 0
+    silent! unlet s:v.bs_count
+    silent! unlet s:v.last_icmd
 
     call s:step_back()
     call s:V.Edit.post_process(0,0)

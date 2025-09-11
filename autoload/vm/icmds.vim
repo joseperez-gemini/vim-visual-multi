@@ -25,6 +25,12 @@ fun! vm#icmds#x(cmd) abort
     if empty(s:v.storepos) | let s:v.storepos = getpos('.')[1:2] | endif
     let active = s:R()[s:V.Insert.index]
 
+    " Track consecutive backspaces for undojoin
+    if !exists('s:v.last_icmd') || s:v.last_icmd != a:cmd
+        let s:v.bs_count = 0
+    endif
+    let s:v.last_icmd = a:cmd
+
     for r in s:R()
         if s:v.single_region && r isnot active
             if r.l == active.l
@@ -68,6 +74,10 @@ fun! vm#icmds#x(cmd) abort
             keepjumps normal! kgJ
             call r.shift(-1,-1)
         else                                "normal backspace
+            " Use undojoin for consecutive backspaces after the first
+            if a:cmd ==# 'X' && s:v.bs_count > 0
+                silent! undojoin
+            endif
             keepjumps normal! X
             let w = strlen(@-)
             call r.shift(-w, -w)
@@ -79,6 +89,11 @@ fun! vm#icmds#x(cmd) abort
 
     call s:G.merge_regions()
     call s:G.select_region(s:V.Insert.index)
+
+    " Increment backspace counter for undojoin tracking
+    if a:cmd ==# 'X'
+        let s:v.bs_count = get(s:v, 'bs_count', 0) + 1
+    endif
 endfun
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
