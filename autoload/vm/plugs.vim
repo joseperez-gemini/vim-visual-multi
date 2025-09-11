@@ -222,7 +222,7 @@ fun! vm#plugs#buffer() abort
   inoremap <silent><expr> <Plug>(VM-I-Right-Arrow)      <sid>Insert('l')
   inoremap <silent><expr> <Plug>(VM-I-Up-Arrow)         <sid>Insert('k')
   inoremap <silent><expr> <Plug>(VM-I-Down-Arrow)       <sid>Insert('j')
-  inoremap <silent><expr> <Plug>(VM-I-Return)           <sid>Insert('cr')
+  inoremap <silent><expr> <Plug>(VM-I-Return)           <sid>CocAwareInsert('cr')
   inoremap <silent><expr> <Plug>(VM-I-BS)               <sid>Insert('X')
   inoremap <silent><expr> <Plug>(VM-I-Paste)            <sid>Insert('c-v')
   inoremap <silent><expr> <Plug>(VM-I-CtrlW)            <sid>Insert('c-w')
@@ -259,6 +259,18 @@ fun! s:O(upper)
   else
     call b:VM_Selection.Insert.key(a:upper ? 'O' : 'o')
   endif
+endfun
+
+fun! s:CocAwareInsert(key) abort
+  " Handle CR with CoC awareness
+  if a:key ==? 'cr' && exists('g:did_coc_loaded')
+    if exists('*coc#pum#visible') && coc#pum#visible()
+      return coc#pum#confirm()
+    elseif pumvisible()
+      return "\<C-y>"
+    endif
+  endif
+  return s:Insert(a:key)
 endfun
 
 fun! s:Insert(key) abort

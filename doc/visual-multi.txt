@@ -171,7 +171,7 @@ Finally, some |object-motions| and |various-motions| require |multiline-mode|,
 and some are aliased to avoid conflict with VM mappings:
 
    vim    VM~
-    /     g/      to next match (for all regions)
+    g/           to next match (for all regions)
     (     (       [count] sentences backward
     )     )       [count] sentences forward
     {     {       [count] paragraphs backward
@@ -438,8 +438,13 @@ Slash motion~
 
   Default mapping: g/
 
-  Key `/` is not mapped by default, so that you can perform regular searches
-  for words to add. Instead, use `g/` if you want `/` to work on all regions.
+  By default, `/` is left unmapped so you can perform regular Vim searches.
+  The `g/` mapping performs search on all regions/cursors simultaneously.
+
+  If you want `/` to work like `g/` (search on all regions), add this to your
+  vimrc:
+    let g:VM_maps = {}
+    let g:VM_maps['Slash Search'] = '/'
 
   Note that `n` and `N` can't be used to repeat the search, because they are
   used to get the next VM match.

@@ -83,7 +83,10 @@ fun! s:Maps.start() abort
     for m in b:VM_maps           | exe m | endfor
 
     nmap              <nowait> <buffer> :          <Plug>(VM-:)
-    nmap              <nowait> <buffer> /          <Plug>(VM-/)
+    " Only map / to VM-/ if it wasn't already mapped by user configuration
+    if maparg('/', 'n') !~# '<Plug>(VM-'
+        nmap              <nowait> <buffer> /          <Plug>(VM-/)
+    endif
     nmap              <nowait> <buffer> ?          <Plug>(VM-?)
 
     " user autocommand after mappings have been set
@@ -112,9 +115,9 @@ fun! s:Maps.end(keep_permanent) abort
     for m in g:Vm.unmaps | exe m | endfor
     for m in b:VM_unmaps | exe m | endfor
 
-    nunmap <buffer> :
-    nunmap <buffer> /
-    nunmap <buffer> ?
+    silent! nunmap <buffer> :
+    silent! nunmap <buffer> /
+    silent! nunmap <buffer> ?
     silent! cunmap <buffer> <cr>
     silent! cunmap <buffer> <esc>
 

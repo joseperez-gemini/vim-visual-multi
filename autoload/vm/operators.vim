@@ -81,7 +81,11 @@ fun! s:select(obj) abort
         let cmd = 'y' . a:obj
     endif
 
-    silent! nunmap <buffer> y
+    try
+        nunmap <buffer> y
+    catch /E31:/
+        " Mapping doesn't exist, ignore
+    endtry
 
     let Rs = map(copy(s:R()), '[v:val.l, v:val.a]')
     call s:G.erase_regions()
@@ -152,7 +156,11 @@ fun! vm#operators#find(start, visual, ...) abort
         call s:updatetime()
         let g:Vm.finding = 1
         let s:vblock = a:visual && mode() == "\<C-v>"
-        silent! nunmap <buffer> y
+        try
+            nunmap <buffer> y
+        catch /E31:/
+            " Mapping doesn't exist, ignore
+        endtry
         return 'y'
     endif
 
