@@ -15,6 +15,7 @@ fun! vm#plugs#permanent() abort
 
   nnoremap <silent>       <Plug>(VM-Reselect-Last)           :call vm#commands#reselect_last()<cr>
   nnoremap <silent>       <Plug>(VM-Select-All)              :call vm#commands#find_all(0, 1)<cr>
+  nnoremap <silent>       <Plug>(VM-Smart-gv)                :call vm#plugs#smart_gv()<cr>
   xnoremap <silent><expr> <Plug>(VM-Visual-All)              <sid>Visual('all')
   xnoremap <silent>       <Plug>(VM-Visual-Cursors)          <Esc>:call vm#commands#visual_cursors()<cr>
   xnoremap <silent>       <Plug>(VM-Visual-Add)              <Esc>:call vm#commands#visual_add()<cr>
@@ -280,12 +281,10 @@ fun! vm#plugs#text_object(prefix) abort
     return
   endif
 
-  " In extend mode, wait for text object
-  echo a:prefix
+  " In extend mode, wait for text object (silently like normal vim)
   let c = getchar()
 
   if c == 27  " Esc key
-    echo "\r"
     return
   endif
 
@@ -297,12 +296,26 @@ fun! vm#plugs#text_object(prefix) abort
   let s:double = { c -> index(split('iafFtTg', '\zs'), c) >= 0              }
 
   if s:single(char) || (len(a:prefix . char) == 2)
-    echo char
     " Use the select operator with the text object
     call vm#operators#select(1, a:prefix . char)
+  endif
+  " If invalid text object, just do nothing (like normal vim)
+endfun
+
+fun! vm#plugs#smart_gv() abort
+  " Smart gv: VM reselect if in VM mode, otherwise normal gv
+  if g:Vm.buffer
+    " In VM mode, check if there are regions to restore
+    if exists('b:VM_Backup') && !empty(b:VM_Backup)
+      " Has regions to restore, use VM's reselect last
+      call vm#commands#reselect_last()
+    else
+      " No regions to restore, do nothing (stay in VM mode)
+      echo 'No regions to restore'
+    endif
   else
-    " Not a valid text object, just cancel
-    echo "\r"
+    " Not in VM mode, use normal gv
+    normal! gv
   endif
 endfun
 

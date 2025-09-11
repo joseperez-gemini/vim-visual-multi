@@ -97,6 +97,9 @@ augroup VM_start
   au VimLeavePre  * call s:vm_persist()
 augroup END
 
+" Smart gv mapping - VM reselect if in VM mode, otherwise normal gv
+nnoremap <silent> gv :call vm#plugs#smart_gv()<cr>
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
