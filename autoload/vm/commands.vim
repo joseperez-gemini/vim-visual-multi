@@ -153,6 +153,7 @@ fun! vm#commands#find_by_regex(mode) abort
     " Entry point for VM regex search.
     if !g:Vm.buffer | call s:init(0, 2, 1) | endif
     let s:v.using_regex = a:mode
+    let s:v.regex_backward = 0  " Mark this as forward search
     let s:v.regex_backup = empty(@/) ? '\%^' : @/
 
     "if visual regex, reposition cursor to the beginning of the selection
@@ -170,6 +171,28 @@ fun! vm#commands#find_by_regex(mode) abort
     return '/'
 endfun
 
+fun! vm#commands#find_by_regex_backward(mode) abort
+    " Entry point for VM regex search backward.
+    if !g:Vm.buffer | call s:init(0, 2, 1) | endif
+    let s:v.using_regex = a:mode
+    let s:v.regex_backward = 1  " Mark this as backward search
+    let s:v.regex_backup = empty(@/) ? '\%^' : @/
+
+    "if visual regex, reposition cursor to the beginning of the selection
+    if a:mode == 2
+        keepjumps normal! `<
+    endif
+
+    "store position, restored if the search will be aborted
+    let s:regex_pos = winsaveview()
+
+    cnoremap <silent> <buffer> <cr>  <cr>:call vm#commands#regex_done()<cr>
+    cnoremap <silent><nowait><buffer> <esc><esc> <C-u><C-r>=b:VM_Selection.Vars.regex_backup<cr><esc>:call vm#commands#regex_abort()<cr>
+    cnoremap <silent><nowait><buffer> <esc>      <C-u><C-r>=b:VM_Selection.Vars.regex_backup<cr><esc>:call vm#commands#regex_abort()<cr>
+    call s:F.special_statusline('VM-REGEX')
+    return '?'
+endfun
+
 
 fun! vm#commands#regex_done() abort
     " Terminate the VM regex mode after having entered search a pattern.
@@ -185,6 +208,12 @@ fun! vm#commands#regex_done() abort
         return
 
     elseif extend_current
+        " Set direction based on whether this was backward search
+        if get(s:v, 'regex_backward', 0)
+            let s:v.direction = 0  " backward
+        else
+            let s:v.direction = 1  " forward
+        endif
         call vm#commands#regex_motion(@/, 1, 0)
         return
 
@@ -572,9 +601,9 @@ fun! vm#commands#regex_motion(regex, count, remove) abort
         endfor
     else
         for r in ( s:v.single_region ? [R] : s:R() )
-            call cursor(r.l, r.a)
-            let endl = s:v.multiline && !empty(a:regex) ? line('$') : r.l
-            if !search(regex . case, 'b', endl)
+            call cursor(r.L, r.b)
+            let startl = s:v.multiline && !empty(a:regex) ? 1 : r.l
+            if !search(regex . case, 'b', startl)
                 if a:remove | call r.remove() | endif
                 continue
             endif

@@ -25,6 +25,7 @@ fun! vm#plugs#permanent() abort
 
   nnoremap <silent>       <Plug>(VM-Start-Regex-Search)      @=vm#commands#find_by_regex(1)<cr>
   nnoremap <silent>       <Plug>(VM-Slash-Search)            @=vm#commands#find_by_regex(3)<cr>
+  nnoremap <silent>       <Plug>(VM-Question-Search)         @=vm#commands#find_by_regex_backward(3)<cr>
   xnoremap <silent>       <Plug>(VM-Visual-Regex)            :call vm#commands#find_by_regex(2)<cr>:call feedkeys('/', 'n')<cr>
 
   nnoremap <silent>       <Plug>(VM-Left-Mouse)              <LeftMouse>

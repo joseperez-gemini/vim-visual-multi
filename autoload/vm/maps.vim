@@ -87,7 +87,10 @@ fun! s:Maps.start() abort
     if maparg('/', 'n') !~# '<Plug>(VM-'
         nmap              <nowait> <buffer> /          <Plug>(VM-/)
     endif
-    nmap              <nowait> <buffer> ?          <Plug>(VM-?)
+    " Only map ? to VM-? if it wasn't already mapped by user configuration
+    if maparg('?', 'n') !~# '<Plug>(VM-'
+        nmap              <nowait> <buffer> ?          <Plug>(VM-?)
+    endif
 
     " user autocommand after mappings have been set
     silent doautocmd <nomodeline> User visual_multi_mappings
