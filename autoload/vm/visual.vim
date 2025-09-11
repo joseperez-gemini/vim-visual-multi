@@ -257,17 +257,19 @@ endfun
 fun! s:create_cursors(start, end) abort
     "create cursors at each line of visual selection, at the start column
     "start, end are lists: [line, column]
-    let line = a:start[0]
-    let scol = a:start[1]
-    let ecol = a:end[1]
-    let change_col = scol == ecol
+    call cursor(a:start[0], a:start[1])
 
-    for n in range(line, a:end[0])
-        call cursor(n, scol)
-        if s:F.char_under_cursor() =~ '\v\S'
-            call vm#commands#add_cursor(change_col)
-        endif
-    endfor
+    " Ensure there's at least one cursor at the starting position
+    if s:F.char_under_cursor() =~ '\v\S' || a:start[0] == a:end[0]
+        call s:G.new_cursor()
+    endif
+
+    " Add cursors for remaining lines
+    if a:end[0] > a:start[0]
+        while line('.') < a:end[0]
+            call vm#commands#add_cursor_down(0, 1)
+        endwhile
+    endif
 endfun
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
