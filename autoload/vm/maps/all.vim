@@ -12,6 +12,7 @@
 
 let s:base = {
       \"Reselect Last":           ['', 'n'],
+      \"Reselect Last Cursors":   ['', 'n'],
       \"Add Cursor At Pos":       ['', 'n'],
       \"Add Cursor At Word":      ['', 'n'],
       \"Start Regex Search":      ['', 'n'],
@@ -53,6 +54,7 @@ fun! vm#maps#all#permanent() abort
 
   if g:VM_default_mappings
     let maps["Reselect Last"][0]         = leader.'gS'
+    let maps["Reselect Last Cursors"][0] = leader.'o'
     let maps["Add Cursor At Pos"][0]     = leader.'\'
     let maps["Start Regex Search"][0]    = leader.'/'
     let maps["Select All"][0]            = leader.'A'

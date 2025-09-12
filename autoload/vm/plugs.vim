@@ -14,6 +14,7 @@ fun! vm#plugs#permanent() abort
   nnoremap <silent>       <Plug>(VM-Select-Cursor-Up)        :<C-u>call vm#commands#add_cursor_up(1, v:count1)<cr>
 
   nnoremap <silent>       <Plug>(VM-Reselect-Last)           :call vm#commands#reselect_last()<cr>
+  nnoremap <silent>       <Plug>(VM-Reselect-Last-Cursors)   :call vm#commands#reselect_last_cursors()<cr>
   nnoremap <silent>       <Plug>(VM-Select-All)              :call vm#commands#find_all(0, 1)<cr>
   nnoremap <silent>       <Plug>(VM-Smart-gv)                :call vm#plugs#smart_gv()<cr>
   xnoremap <silent><expr> <Plug>(VM-Visual-All)              <sid>Visual('all')
@@ -305,13 +306,13 @@ endfun
 fun! vm#plugs#smart_gv() abort
   " Smart gv: VM reselect if in VM mode, otherwise normal gv
   if g:Vm.buffer
-    " In VM mode, check if there are regions to restore
-    if exists('b:VM_Backup') && !empty(b:VM_Backup)
-      " Has regions to restore, use VM's reselect last
+    " In VM mode, only restore extend mode selections
+    if exists('b:VM_LastBackup_Extend') && !empty(get(b:VM_LastBackup_Extend, 'regions', []))
+      " Has extend regions to restore
       call vm#commands#reselect_last()
     else
-      " No regions to restore, do nothing (stay in VM mode)
-      echo 'No regions to restore'
+      " No extend regions to restore
+      echo 'No extend regions to restore'
     endif
   else
     " Not in VM mode, use normal gv

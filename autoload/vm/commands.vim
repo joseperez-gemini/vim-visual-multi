@@ -919,8 +919,17 @@ endfun
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 fun! vm#commands#reselect_last()
+    " Restore extend mode selections.
     let was_active = s:init(0, 1, 0)
-    if empty(get(b:, 'VM_LastBackup', {})) || empty(get(b:VM_LastBackup, 'regions', []))
+
+    " Use extend backup if available, otherwise fall back to legacy backup for compatibility
+    if exists('b:VM_LastBackup_Extend') && !empty(get(b:VM_LastBackup_Extend, 'regions', []))
+        let backup = b:VM_LastBackup_Extend
+        let extend_mode = 1
+    elseif exists('b:VM_LastBackup') && !empty(get(b:VM_LastBackup, 'regions', [])) && b:VM_LastBackup.extend
+        let backup = b:VM_LastBackup
+        let extend_mode = b:VM_LastBackup.extend
+    else
         return s:F.exit('No regions to restore')
     endif
 
@@ -931,16 +940,47 @@ fun! vm#commands#reselect_last()
     endif
 
     try
-        for r in b:VM_LastBackup.regions
+        for r in backup.regions
             call vm#region#new(1, r.A, r.B)
         endfor
-        let g:Vm.extend_mode = b:VM_LastBackup.extend
-        let s:v.search = b:VM_LastBackup.search
+        let g:Vm.extend_mode = extend_mode
+        let s:v.search = backup.search
     catch
         return s:F.exit('Error while restoring regions.')
     endtry
 
-    call s:G.update_and_select_region({'index': b:VM_LastBackup.index})
+    call s:G.update_and_select_region({'index': backup.index})
+endfun
+
+
+fun! vm#commands#reselect_last_cursors()
+    " Restore cursor positions.
+    let was_active = s:init(0, 1, 0)
+
+    " Use cursor backup if available, otherwise fall back to legacy backup
+    if exists('b:VM_LastBackup_Cursor') && !empty(get(b:VM_LastBackup_Cursor, 'regions', []))
+        let backup = b:VM_LastBackup_Cursor
+    elseif exists('b:VM_LastBackup') && !empty(get(b:VM_LastBackup, 'regions', [])) && !b:VM_LastBackup.extend
+        let backup = b:VM_LastBackup
+    else
+        return s:F.exit('No cursor positions to restore')
+    endif
+
+    if was_active
+        call s:G.erase_regions()
+    endif
+
+    try
+        for r in backup.regions
+            call vm#region#new(1, r.A, r.B)
+        endfor
+        let g:Vm.extend_mode = 0
+        let s:v.search = backup.search
+    catch
+        return s:F.exit('Error while restoring cursor positions.')
+    endtry
+
+    call s:G.update_and_select_region({'index': backup.index})
 endfun
 
 
