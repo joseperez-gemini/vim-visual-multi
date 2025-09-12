@@ -329,13 +329,13 @@ fun! s:Global.backup_last_regions() abort
     if g:Vm.extend_mode
         " Backup extend mode selections
         let b:VM_LastBackup_Extend = {}
-        let b:VM_LastBackup_Extend.regions = map(deepcopy(s:R()), "{'A': v:val.A, 'B': v:val.B}")
+        let b:VM_LastBackup_Extend.regions = map(deepcopy(s:R()), "{'l': v:val.l, 'L': v:val.L, 'a': v:val.a, 'b': v:val.b}")
         let b:VM_LastBackup_Extend.search = s:v.search
         let b:VM_LastBackup_Extend.index = s:v.index
     else
         " Backup cursor positions
         let b:VM_LastBackup_Cursor = {}
-        let b:VM_LastBackup_Cursor.regions = map(deepcopy(s:R()), "{'A': v:val.A, 'B': v:val.B}")
+        let b:VM_LastBackup_Cursor.regions = map(deepcopy(s:R()), "{'l': v:val.l, 'L': v:val.L, 'a': v:val.a, 'b': v:val.b}")
         let b:VM_LastBackup_Cursor.search = s:v.search
         let b:VM_LastBackup_Cursor.index = s:v.index
     endif

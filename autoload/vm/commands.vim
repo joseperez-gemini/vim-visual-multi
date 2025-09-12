@@ -939,17 +939,34 @@ fun! vm#commands#reselect_last()
         return s:F.msg('Not in extend mode.')
     endif
 
-    try
-        for r in backup.regions
-            call vm#region#new(1, r.A, r.B)
-        endfor
-        let g:Vm.extend_mode = extend_mode
-        let s:v.search = backup.search
-    catch
-        return s:F.exit('Error while restoring regions.')
-    endtry
+    let restored = 0
+    let max_line = line('$')
 
-    call s:G.update_and_select_region({'index': backup.index})
+    for r in backup.regions
+        try
+            " Skip if lines don't exist
+            if r.l < 1 || r.l > max_line || r.L < 1 || r.L > max_line
+                continue
+            endif
+
+            " Use vm#region#new with original line/column positions
+            " Let VM handle any out-of-bounds positions
+            call vm#region#new(1, r.l, r.L, r.a, r.b)
+            let restored += 1
+        catch
+            " Skip this region if it fails
+            continue
+        endtry
+    endfor
+
+    if restored == 0
+        return s:F.exit('Buffer has changed, cannot restore regions.')
+    endif
+
+    let g:Vm.extend_mode = extend_mode
+    let s:v.search = backup.search
+
+    call s:G.update_and_select_region({'index': min([backup.index, len(s:R()) - 1])})
 endfun
 
 
@@ -970,17 +987,34 @@ fun! vm#commands#reselect_last_cursors()
         call s:G.erase_regions()
     endif
 
-    try
-        for r in backup.regions
-            call vm#region#new(1, r.A, r.B)
-        endfor
-        let g:Vm.extend_mode = 0
-        let s:v.search = backup.search
-    catch
-        return s:F.exit('Error while restoring cursor positions.')
-    endtry
+    let restored = 0
+    let max_line = line('$')
 
-    call s:G.update_and_select_region({'index': backup.index})
+    for r in backup.regions
+        try
+            " Skip if line doesn't exist
+            if r.l < 1 || r.l > max_line
+                continue
+            endif
+
+            " Use vm#region#new with original cursor position
+            " Let VM handle any out-of-bounds positions (cursor: same line and column for start/end)
+            call vm#region#new(1, r.l, r.l, r.a, r.a)
+            let restored += 1
+        catch
+            " Skip this cursor if it fails
+            continue
+        endtry
+    endfor
+
+    if restored == 0
+        return s:F.exit('Buffer has changed, cannot restore cursor positions.')
+    endif
+
+    let g:Vm.extend_mode = 0
+    let s:v.search = backup.search
+
+    call s:G.update_and_select_region({'index': min([backup.index, len(s:R()) - 1])})
 endfun
 
 
