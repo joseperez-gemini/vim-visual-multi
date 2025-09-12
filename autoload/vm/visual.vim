@@ -16,6 +16,9 @@ fun! vm#visual#add(mode) abort
         if !g:VM_use_first_cursor_in_line
             if s:v.silence
                 call s:G.select_region(len(s:R())-1)
+            else
+                " Force select the last region to ensure proper cursor positioning
+                call s:G.select_region(len(s:R())-1)
             endif
         else
             let ix = s:G.lines_with_regions(0, s:R()[-1].l)[s:R()[-1].l][0]
@@ -23,6 +26,9 @@ fun! vm#visual#add(mode) abort
         endif
     else
         if s:v.silence
+            call s:G.select_region(len(s:R())-1)
+        else
+            " Force select the last region to ensure proper cursor positioning
             call s:G.select_region(len(s:R())-1)
         endif
     endif
@@ -219,7 +225,11 @@ fun! s:vline() abort
     "linewise selection
     let [line1, line2] = [getpos("'<")[1], getpos("'>")[1]]
     for n in range(line1, line2)
-        call cursor(n, 1) | call s:G.new_region({'go_back': 1})
+        call cursor(n, 1)
+        " Exit any existing visual mode first, then select current line
+        execute "normal! \<Esc>"
+        execute "keepjumps normal! V$y"
+        call s:G.new_region()
     endfor
 endfun
 
@@ -228,6 +238,7 @@ fun! s:vblock(extend) abort
     "blockwise selection
     let start = getpos("'<")[1:2]
     let end = getpos("'>")[1:2]
+    let orig_cursor = getpos('.')[1:2]
 
     if ( start[1] > end[1] )
         let s = end[1] | let e = start[1]
@@ -249,6 +260,26 @@ fun! s:vblock(extend) abort
             call s:G.new_region()
         endif
     endfor
+
+    " Position cursor based on where it originally was
+    " Set direction for newly created regions
+    if len(s:R()) > 0
+        let num_regions_before = len(s:R())
+        let regions_to_fix = s:R()[max([0, num_regions_before-3]):]  " Get the last few regions we just created
+
+        if orig_cursor[1] == end[1]  " Cursor was at end column
+            " Put cursor at end of each newly created region
+            for region in regions_to_fix
+                let region.dir = 1  " Set direction to forward (cursor at end)
+            endfor
+        else
+            " Cursor was at start column
+            for region in regions_to_fix
+                let region.dir = 0  " Set direction to backward (cursor at start)
+            endfor
+        endif
+    endif
+
     return s:v.direction
 endfun
 
