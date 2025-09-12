@@ -271,8 +271,11 @@ fun! s:assign(plug, key, buffer, ...) abort
                 call add(b:VM_Debug.lines, s)
                 return ''
             else
-                let s = b.'Overwritten imap: '.k.' ('.a:plug.')  ->  ' . rhs
-                call add(b:VM_Debug.lines, s)
+                " Skip warning for common <BS> override (usually harmless)
+                if k !=# '<BS>'
+                    let s = b.'Overwritten imap: '.k.' ('.a:plug.')  ->  ' . rhs
+                    call add(b:VM_Debug.lines, s)
+                endif
             endif
         endif
     endif
