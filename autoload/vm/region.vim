@@ -500,8 +500,8 @@ fun! s:Region.highlight() abort
 
     if !s:X()
         let R.matches.cursor = R.a == 1
-                    \ ? matchadd('MultiCursor', '\%' . R.l . 'l\%1c')
-                    \ : matchaddpos('MultiCursor', [[R.l, R.a]], 40)
+                    \ ? matchadd('MultiCursor', '\%' . R.l . 'l\%1c', 1001)
+                    \ : matchaddpos('MultiCursor', [[R.l, R.a]], 1001)
         return
     endif
 
@@ -525,9 +525,9 @@ fun! s:Region.highlight() abort
 
     "build a list of highlight entries, one for each possible line
     for line in region
-        call add(R.matches.region, matchaddpos('VM_Extend', [line], 30))
+        call add(R.matches.region, matchaddpos('VM_Extend', [line], 1000))
     endfor
-    let R.matches.cursor = matchaddpos('MultiCursor', [cursor], 40)
+    let R.matches.cursor = matchaddpos('MultiCursor', [cursor], 1001)
 endfun
 
 

@@ -420,7 +420,7 @@ fun! s:Cursor.new(ln, col) abort
     let C.a      = a:col
     let C._a     = C.a
     let C.active = ( C.index == s:Insert.index )
-    let C.hl     = matchaddpos('MultiCursor', [[C.l, C.a]], 40)
+    let C.hl     = matchaddpos('MultiCursor', [[C.l, C.a]], 1001)
 
     return C
 endfun
@@ -432,7 +432,7 @@ fun! s:Cursor.update(ln, change) abort
     let C._a = C.a + a:change
 
     silent! call matchdelete(C.hl)
-    let C.hl  = matchaddpos('MultiCursor', [[C.l, C._a]], 40)
+    let C.hl  = matchaddpos('MultiCursor', [[C.l, C._a]], 1001)
 endfun
 
 
