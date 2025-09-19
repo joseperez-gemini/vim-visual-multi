@@ -67,13 +67,27 @@ fun! vm#visual#cursors(mode) abort
     let [pos, start, end] = [getpos('.')[1:2],
                 \            getpos("'<")[1:2], getpos("'>")[1:2]]
 
-    call s:create_cursors(start, end)
+    call s:create_cursors(start, end, a:mode, pos)
 
     if a:mode ==# 'V' && get(g:, 'VM_autoremove_empty_lines', 1)
         call s:G.remove_empty_lines()
     endif
 
     call s:G.update_and_select_region(pos)
+endfun
+
+fun! vm#visual#cursors_with_pos(mode, cursor_pos) abort
+    " Create cursors with explicit cursor position (for preserving block cursor corner).
+    call s:init()
+    let [start, end] = [getpos("'<")[1:2], getpos("'>")[1:2]]
+
+    call s:create_cursors(start, end, a:mode, a:cursor_pos)
+
+    if a:mode ==# 'V' && get(g:, 'VM_autoremove_empty_lines', 1)
+        call s:G.remove_empty_lines()
+    endif
+
+    call s:G.update_and_select_region(a:cursor_pos)
 endfun
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -160,7 +174,7 @@ fun! vm#visual#find_in_selection() abort
 
     " Find first match
     if search(pat, 'czW', endline)
-        silent keepjumps normal! ygn
+        call vm#highlightedyank#execute_silent('silent keepjumps normal! ygn')
         let match_line = getpos("'[")[1]
         if match_line >= startline && match_line <= endline
             if mode ==# 'V' || (mode ==# 'v')
@@ -181,7 +195,7 @@ fun! vm#visual#find_in_selection() abort
         if !search(pat, 'zW', endline)
             break
         endif
-        silent keepjumps normal! ygn
+        call vm#highlightedyank#execute_silent('silent keepjumps normal! ygn')
         let match_line = getpos("'[")[1]
 
         if match_line > endline
@@ -216,7 +230,7 @@ endfun
 
 fun! s:vchar() abort
     "characterwise selection
-    silent keepjumps normal! `<y`>`]
+    call vm#highlightedyank#execute_silent('silent keepjumps normal! `<y`>`]')
     call s:G.check_mutliline(0, s:G.new_region())
 endfun
 
@@ -228,7 +242,7 @@ fun! s:vline() abort
         call cursor(n, 1)
         " Exit any existing visual mode first, then select current line
         execute "normal! \<Esc>"
-        execute "keepjumps normal! V$y"
+        call vm#highlightedyank#keepjumps_normal_silent('V$y')
         call s:G.new_region()
     endfor
 endfun
@@ -240,15 +254,17 @@ fun! s:vblock(extend) abort
     let end = getpos("'>")[1:2]
     let orig_cursor = getpos('.')[1:2]
 
+
     if ( start[1] > end[1] )
         let s = end[1] | let e = start[1]
     else
         let s = start[1] | let e = end[1]
     endif
 
+
     if start == end
         if a:extend
-            keepjumps normal! gvy
+            call vm#highlightedyank#execute_silent('keepjumps normal! gvy')
             return s:G.new_region()
         else | return | endif
     endif
@@ -256,7 +272,11 @@ fun! s:vblock(extend) abort
     for n in range(start[0], end[0])
         call cursor(n, s)
         if s:F.char_under_cursor() =~ '\v\S'
-            exe "keepjumps normal! \<C-v>".( e - s )."l"."y"
+            if s == e
+                call vm#highlightedyank#execute_silent('keepjumps normal! vy')
+            else
+                call vm#highlightedyank#execute_silent('keepjumps normal! \<C-v>'.( e - s ).'l'.'y')
+            endif
             call s:G.new_region()
         endif
     endfor
@@ -285,21 +305,113 @@ endfun
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-fun! s:create_cursors(start, end) abort
-    "create cursors at each line of visual selection, at the start column
+fun! s:create_cursors(start, end, mode, ...) abort
+    "create cursors at each line of visual selection
     "start, end are lists: [line, column]
-    call cursor(a:start[0], a:start[1])
+    "mode: visual mode ('v', 'V', or ctrl-v)
+    "a:1 (optional): original cursor position [line, column]
 
-    " Ensure there's at least one cursor at the starting position
-    if s:F.char_under_cursor() =~ '\v\S' || a:start[0] == a:end[0]
+    if a:mode ==# 'V'
+        " Line-wise: start at first non-blank of each line (cursor mode)
+        call cursor(a:start[0], 1)
+        normal! ^
         call s:G.new_cursor()
-    endif
 
-    " Add cursors for remaining lines
-    if a:end[0] > a:start[0]
-        while line('.') < a:end[0]
-            call vm#commands#add_cursor_down(0, 1)
-        endwhile
+        " Add cursors for remaining lines, each at first non-blank
+        if a:end[0] > a:start[0]
+            for line_num in range(a:start[0] + 1, a:end[0])
+                call cursor(line_num, 1)
+                normal! ^
+                if s:F.char_under_cursor() =~ '\v\S'
+                    call s:G.new_cursor()
+                endif
+            endfor
+        endif
+    elseif a:mode ==# "\<C-v>"
+        " Block-wise: create regions matching the visual block
+        " In visual block mode, when called from visual mode mapping,
+        " the cursor position should still be correct
+        let [actual_line, actual_col] = a:0 > 0 ? a:1 : [line('.'), col('.')]
+
+        " Save the original visual marks before we mess with them
+        let saved_vstart = getpos("'<")
+        let saved_vend = getpos("'>")
+
+
+        let [start_col, end_col] = [min([a:start[1], a:end[1]]), max([a:start[1], a:end[1]])]
+
+        " Determine cursor position relative to selection
+        let cursor_at_bottom = (actual_line == a:end[0])
+        let cursor_at_top = (actual_line == a:start[0])
+        let cursor_at_right = (actual_col == end_col)
+        let cursor_at_left = (actual_col == start_col)
+
+        " Determine if cursor should be at end of regions (1) or start (0)
+        let region_dir = cursor_at_right ? 1 : 0
+
+        let regions_created = []
+
+        for line_num in range(a:start[0], a:end[0])
+            call cursor(line_num, start_col)
+            " Only create region if there's content in the block area
+            if s:F.char_under_cursor() =~ '\v\S'
+                " Create a region for just the block area on this line
+                " Use visual selection but save/restore marks after
+                let chars_to_select = end_col - start_col
+                if chars_to_select == 0
+                    " Single column selection - select just one character
+                    call vm#highlightedyank#execute_silent('keepjumps normal! vy')
+                else
+                    " Multi-column selection
+                    call vm#highlightedyank#execute_silent('keepjumps normal! v' . chars_to_select . 'ly')
+                endif
+                call s:G.new_region()
+                let regions_created += [len(s:R()) - 1]  " Store region index
+            endif
+        endfor
+
+        " Restore the original visual marks
+        call setpos("'<", saved_vstart)
+        call setpos("'>", saved_vend)
+
+        " Set the visual mode to block by briefly entering and exiting block mode
+        let save_cursor = getpos('.')
+        call cursor(saved_vstart[1], saved_vstart[2])
+        execute "normal! \<C-v>"
+        call cursor(saved_vend[1], saved_vend[2])
+        execute "normal! \<Esc>"
+        call setpos('.', save_cursor)
+
+        " Position active cursor based on original cursor position
+        if len(regions_created) > 0
+            let regions = s:R()
+
+            " Set direction for ALL regions based on whether cursor was left/right
+            for idx in regions_created
+                let regions[idx].dir = region_dir
+            endfor
+
+            " Select the appropriate region based on top/bottom position
+            let target_region_idx = cursor_at_bottom ? regions_created[-1] : regions_created[0]
+
+            " Select the target region
+            call s:G.select_region(target_region_idx)
+        endif
+    else
+        " Character-wise: use original column positioning
+        call cursor(a:start[0], a:start[1])
+
+        " Ensure there's at least one cursor at the starting position
+        if s:F.char_under_cursor() =~ '\v\S' || a:start[0] == a:end[0]
+            call s:G.new_cursor()
+        endif
+
+        " Add cursors for remaining lines
+        if a:end[0] > a:start[0]
+            while line('.') < a:end[0]
+                call vm#commands#add_cursor_down(0, 1)
+            endwhile
+        endif
     endif
 endfun
 

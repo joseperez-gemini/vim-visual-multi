@@ -72,11 +72,11 @@ fun! s:Global.get_all_regions(...) abort
     set nowrapscan eventignore=all
     let [l:start, l:end] = a:0 ? [a:1, a:2] : [1, 0]
     call s:F.Cursor(l:start)
-    silent keepjumps normal! ygn
+    call vm#highlightedyank#execute_silent('silent keepjumps normal! ygn')
     let R = self.new_region()
     while 1
         try
-            silent keepjumps normal! nygn
+            call vm#highlightedyank#execute_silent('silent keepjumps normal! nygn')
             if a:0 && s:F.pos2byte("'[") > l:end
                 break
             endif

@@ -179,7 +179,7 @@ fun! vm#operators#find(start, visual, ...) abort
 
     let ows = &wrapscan
     set nowrapscan
-    silent keepjumps normal! ygn
+    call vm#highlightedyank#execute_silent('silent keepjumps normal! ygn')
     if s:vblock
         let R = getpos('.')[2]
         if !( R < startcol || R > endcol )
@@ -191,7 +191,7 @@ fun! vm#operators#find(start, visual, ...) abort
 
     while 1
         if !search(join(s:v.search, '\|'), 'znp', endline) | break | endif
-        silent keepjumps normal! nygn
+        call vm#highlightedyank#execute_silent('silent keepjumps normal! nygn')
         if getpos("'[")[1] > endline
             break
         elseif s:vblock

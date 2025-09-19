@@ -136,7 +136,7 @@ fun! vm#commands#add_cursor_at_word(yank, search) abort
     call s:init(0, 1, 0)
 
     if a:yank
-        keepjumps normal! viwy`[
+        call vm#highlightedyank#keepjumps_normal_silent('viwy`[')
     endif
     if a:search | call s:Search.add() | endif
 
@@ -217,8 +217,8 @@ fun! vm#commands#regex_done() abort
         call vm#commands#regex_motion(@/, 1, 0)
         return
 
-    elseif s:X() | silent keepjumps normal! gny`]
-    else         | silent keepjumps normal! gny
+    elseif s:X() | call vm#highlightedyank#execute_silent('silent keepjumps normal! gny`]')
+    else         | call vm#highlightedyank#execute_silent('silent keepjumps normal! gny')
     endif
     call s:Search.get_slash_reg()
 
@@ -286,7 +286,7 @@ fun! vm#commands#find_under(visual, whole, ...) abort
     if a:0 && s:is_r() | return vm#commands#find_next(0, 0) | endif
 
     " yank and create region
-    if !a:visual | exe 'normal! viwy`]' | endif
+    if !a:visual | call vm#highlightedyank#execute_silent('normal! viwy`]') | endif
 
     "replace region if calling the command on an existing region
     if s:is_r() | call s:G.region_at_pos().remove() | endif
@@ -294,6 +294,40 @@ fun! vm#commands#find_under(visual, whole, ...) abort
     call s:Search.add()
     let R = s:G.new_region()
     call s:G.check_mutliline(0, R)
+
+    " Smart initialization: if there are more matches available, add the next one too
+    " This prevents auto-exit from triggering inappropriately during multi-match scenarios
+    if !a:visual && len(s:V.Regions) == 1
+        " Save current position and search state
+        let save_pos = getpos('.')
+        let orig_search = @/
+
+        " Temporarily disable auto-exit during smart initialization
+        let b:VM_disable_auto_exit = 1
+
+        " Try to find next match and create region directly (without using find_next)
+        try
+            let next_pos = search(@/, 'Wn')
+            if next_pos > 0
+                " Found another match - create region directly at this position
+                call cursor(next_pos, 1)
+                call vm#highlightedyank#execute_silent('silent keepjumps normal! ngny`]')
+                call s:G.new_region()
+                " Make the newly created region at current cursor position active
+                call s:G.select_region_at_pos('.')
+            endif
+        catch
+            " If search fails, ignore and continue with single region
+        finally
+            " Re-enable auto-exit, restore search register but NOT cursor position
+            " Leave cursor at the last region created so next search continues from there
+            unlet! b:VM_disable_auto_exit
+            let @/ = orig_search
+            " Don't restore cursor position - leave it at the last region
+            " call setpos('.', save_pos)
+        endtry
+    endif
+
     return (a:0 && a:visual)? s:G.region_at_pos() : s:G.merge_overlapping(R)
 endfun
 
@@ -378,10 +412,10 @@ endfun
 fun! s:get_next() abort
     let s:v.nav_direction = 1
     if s:X()
-        silent keepjumps normal! ngny`]
+        call vm#highlightedyank#execute_silent('silent keepjumps normal! ngny`]')
         return s:G.new_region()
     else
-        silent keepjumps normal! ngny`[
+        call vm#highlightedyank#execute_silent('silent keepjumps normal! ngny`[')
         return vm#commands#add_cursor_at_word(0, 0)
     endif
 endfun
@@ -389,16 +423,18 @@ endfun
 fun! s:get_prev() abort
     let s:v.nav_direction = 0
     if s:X()
-        silent keepjumps normal! NgNy`]
+        call vm#highlightedyank#execute_silent('silent keepjumps normal! NgNy`]')
         return s:G.new_region()
     else
-        silent keepjumps normal! NgNy`[
+        call vm#highlightedyank#execute_silent('silent keepjumps normal! NgNy`[')
         return vm#commands#add_cursor_at_word(0, 0)
     endif
 endfun
 
 fun! s:navigate(force, dir) abort
-    if a:force || @/==''
+    " Only navigate between existing regions if forced or no search pattern exists
+    " Check both @/ and VM's internal search patterns
+    if a:force || (@/=='' && empty(get(s:v, 'search', [])))
         let s:v.nav_direction = a:dir
         let r = s:G.region_at_pos()
         if empty(r)
@@ -409,6 +445,7 @@ fun! s:navigate(force, dir) abort
         call s:G.select_region(i)
         return 1
     endif
+    return 0
 endfun
 
 fun! s:skip() abort
@@ -822,8 +859,37 @@ endfun
 
 fun! vm#commands#visual_cursors() abort
     " Create a column of cursors from visual mode.
-    call s:set_extend_mode(0)
-    call vm#visual#cursors(visualmode())
+    " Disable auto-exit during cursor creation
+    let b:VM_disable_auto_exit = 1
+    try
+        let mode = visualmode()
+        " Line mode (V) uses cursor mode, block mode uses extend mode
+        let use_extend = (mode !=# 'V')
+        call s:set_extend_mode(use_extend)
+        call vm#visual#cursors(mode)
+    finally
+        " Re-enable auto-exit, but don't trigger it immediately for multiple cursors
+        unlet! b:VM_disable_auto_exit
+    endtry
+endfun
+
+fun! vm#commands#visual_cursors_with_pos(line, col) abort
+    " Create a column of cursors from visual mode with explicit cursor position.
+    " Disable auto-exit during cursor creation
+    let b:VM_disable_auto_exit = 1
+    try
+        let mode = visualmode()
+        let cursor_pos = [a:line, a:col]
+
+        " Line mode (V) uses cursor mode, block mode uses extend mode
+        let use_extend = (mode !=# 'V')
+        call s:set_extend_mode(use_extend)
+        " Pass the cursor position to the visual cursors function
+        call vm#visual#cursors_with_pos(mode, cursor_pos)
+    finally
+        " Re-enable auto-exit, but don't trigger it immediately for multiple cursors
+        unlet! b:VM_disable_auto_exit
+    endtry
 endfun
 
 

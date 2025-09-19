@@ -25,8 +25,8 @@ function! s:check_and_exit(...) abort
     let region_count = len(regions)
 
     " If we have 1 or fewer regions, exit VM mode
+    " Simple and direct - no complex timing needed since we'll start with 2 regions when possible
     if region_count <= 1
-        " Use a timer to avoid potential recursive calls during VM operations
         call timer_start(1, {-> s:do_exit()})
     endif
 
@@ -89,15 +89,17 @@ function! s:restore_visual_from_region(region) abort
 endfunction
 
 function! s:enhanced_region_check(...) abort
-    " More frequent checking during VM operations
+    " More frequent checking during VM operations, but less aggressive
     if !exists('b:visual_multi') || !exists('b:VM_Selection')
         return
     endif
 
     let current_count = len(b:VM_Selection.Regions)
 
-    " Check if region count changed (especially decreased to 1)
-    if current_count <= 1 || (s:last_region_count > 1 && current_count == 1)
+    " Only trigger on significant changes, not during navigation
+    " This reduces interference with find_next operations
+    if current_count <= 1 && s:last_region_count > 1
+        " Region count dropped to 1 - schedule delayed check
         call s:check_and_exit()
     endif
 

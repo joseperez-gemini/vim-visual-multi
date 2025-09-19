@@ -314,12 +314,22 @@ fun! s:Edit.process(cmd, ...) abort
 
         if gcount
             let tick = b:changedtick
-            exe 'normal! ' . gcount . a:cmd
+            " Check if command contains yank operation - if so, suppress highlightedyank
+            if a:cmd =~ '\v^.*y[^a-zA-Z]|^y$'
+                call vm#highlightedyank#execute_silent('normal! ' . gcount . a:cmd)
+            else
+                exe 'normal! ' . gcount . a:cmd
+            endif
             if b:changedtick > tick
                 let gcount += a:1.count
             endif
         else
-            exe a:cmd
+            " Check if command contains yank operation - if so, suppress highlightedyank
+            if a:cmd =~ '\v^.*y[^a-zA-Z]|^y$'
+                call vm#highlightedyank#execute_silent(a:cmd)
+            else
+                exe a:cmd
+            endif
         endif
 
         " store deleted text during deletions/changes at cursors

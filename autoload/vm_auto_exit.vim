@@ -7,6 +7,11 @@ function! vm_auto_exit#check_and_exit() abort
         return
     endif
 
+    " Skip auto-exit if temporarily disabled
+    if exists('b:VM_disable_auto_exit')
+        return
+    endif
+
     " Get the regions list
     let regions = b:VM_Selection.Regions
 
@@ -19,13 +24,13 @@ endfunction
 
 function! vm_auto_exit#do_exit() abort
     " Double-check VM is still active before exiting
-    if exists('b:visual_multi')
-        call vm#hard_reset()
+    if exists('b:visual_multi') && exists('b:VM_Selection')
         " Restore cursor position if we had one region
-        if exists('b:VM_Selection') && len(b:VM_Selection.Regions) == 1
+        if has_key(b:VM_Selection, 'Regions') && len(b:VM_Selection.Regions) == 1
             let region = b:VM_Selection.Regions[0]
             call cursor(region.l, region.a)
         endif
+        call vm#hard_reset()
     endif
 endfunction
 

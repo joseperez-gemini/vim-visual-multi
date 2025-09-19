@@ -427,7 +427,7 @@ fun! s:Region.update_content() abort
     " Get region content if in extend mode.
     let r = self
     call cursor(r.l, r.a)   | keepjumps normal! m[
-    call cursor(r.L, r.b+1) | silent keepjumps normal! m]`[y`]
+    call cursor(r.L, r.b+1) | call vm#highlightedyank#execute_silent('silent keepjumps normal! m]`[y`]')
     let r.txt = getreg(s:v.def_reg)
 
     if s:v.multiline && r.b == col([r.L, '$'])

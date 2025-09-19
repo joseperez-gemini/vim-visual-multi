@@ -45,12 +45,29 @@ fun! s:Insert.key(type) abort
     call s:map_single_mode(0)
 
     if a:type ==# 'I'
-        call vm#commands#merge_to_beol(0)
-        call self.key('i')
+        if s:X()
+            " In extend mode, insert at START of each region
+            if !s:v.direction | call vm#commands#invert_direction() | endif
+            call s:G.change_mode()
+            call self.key('i')
+        else
+            " In cursor mode, move to first non-blank of line
+            call vm#commands#motion('^', 1, 0, 0)
+            call self.start()
+        endif
 
     elseif a:type ==# 'A'
-        call vm#commands#merge_to_beol(1)
-        call self.key('a')
+        if s:X()
+            " In extend mode, insert at END of each region
+            if s:v.direction | call vm#commands#invert_direction() | endif
+            call s:G.change_mode()
+            let s:v.direction = 1
+            call self.key('a')
+        else
+            " In cursor mode, move to end of line then use 'a' behavior
+            call vm#commands#motion('$', 1, 0, 0)
+            call self.key('a')
+        endif
 
     elseif a:type ==# 'o'
         call vm#commands#merge_to_beol(1)
