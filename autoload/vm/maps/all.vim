@@ -106,6 +106,7 @@ fun! vm#maps#all#buffer() abort
         \"Remove Last Region":      [leader.'q',  'n'],
         \"Remove Every n Regions":  [leader.'R',  'n'],
         \"Select Operator":         ['s',         'n'],
+        \"Substitute Operator":     ['',          'n'],
         \"Find Operator":           ['m',         'n'],
         \})
 

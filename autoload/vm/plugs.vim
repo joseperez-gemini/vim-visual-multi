@@ -51,6 +51,7 @@ fun! vm#plugs#buffer() abort
   let g:Vm.tobj_motions   = { '{': '{', '}': '}', '(': '(', ')': ')', 'g{': '[{', 'g}': ']}', 'g)': '])', 'g(': '[(' }
 
   nnoremap <silent>       <Plug>(VM-Select-Operator)         :<c-u>call vm#operators#select(v:count)<cr>
+  nnoremap <silent>       <Plug>(VM-Substitute-Operator)     :<c-u>call vm#operators#substitute(v:count)<cr>
   nmap <expr><silent>     <Plug>(VM-Find-Operator)           vm#operators#find(1, 0)
 
   xnoremap <silent>       <Plug>(VM-Visual-Subtract)         :<c-u>call vm#visual#subtract(visualmode())<cr>

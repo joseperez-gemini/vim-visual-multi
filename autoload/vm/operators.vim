@@ -137,6 +137,128 @@ endfun
 
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Substitute operator (like vim-subversive)
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+fun! vm#operators#substitute(count, ...) abort
+    " Substitute operator: replace text object with yanked content.
+    " Usage: s<motion> - replaces the motion with contents of VM register.
+    call s:init()
+    let pos = getpos('.')[1:2]
+    call s:F.Scroll.get(1)
+
+    if a:0 | return s:substitute(a:1) | endif
+
+    let [ abort, s, n ] = [ 0, '', '' ]
+    let x = a:count>1? a:count : 1
+    echo "Substitute: ".(x>1? x : '')
+
+    while 1
+        let c = getchar()
+
+        if c == 27 | let abort = 1      | break
+        else       | let c = nr2char(c) | endif
+
+        if str2nr(c) > 0
+            let n .= c    | echon c
+
+        elseif s:single(c)
+            let s .= c    | echon c | break
+
+        elseif s:double(c) || len(s)
+            let s .= c    | echon c
+            if len(s) > 1 | break   | endif
+
+        else
+            let abort = 1 | break
+        endif
+    endwhile
+
+    if abort | return | endif
+
+    " change $ in g_
+    let s = substitute(s, '\$', 'g_', 'g')
+
+    let n = n<1? 1 : n
+    let n = n*x>1? n*x : ''
+    call s:substitute(n . s)
+    call s:G.update_and_select_region(pos)
+    call s:F.Scroll.restore()
+endfun
+
+fun! s:substitute(obj) abort
+    " Execute substitute operation on all regions.
+    call s:updatetime()
+    call s:V.Maps.disable(1)
+
+    try
+        nunmap <buffer> c
+    catch /E31:/
+        " Mapping doesn't exist, ignore
+    endtry
+
+    let Rs = map(copy(s:R()), '[v:val.l, v:val.a]')
+    call s:G.erase_regions()
+
+    " Get VM registers for pasting
+    let vm_regs = get(g:Vm, 'registers', {})
+    let reg_content = get(vm_regs, '"', [])
+
+    " Track the end positions after pasting
+    let end_positions = []
+
+    for idx in range(len(Rs))
+        let r = Rs[idx]
+        call cursor(r[0], r[1])
+
+        " Delete the text object first using 'd' instead of 'c'
+        let del_cmd = 'd' . a:obj
+        exe "normal!" del_cmd
+
+        " Now paste the yanked content for this cursor
+        if idx < len(reg_content) && !empty(reg_content[idx])
+            let paste_text = reg_content[idx]
+            " Set register and paste before cursor
+            let @" = paste_text
+            exe "normal! P"
+            " Calculate end position: start_col + length - 1
+            let end_col = r[1] + len(paste_text) - 1
+            call add(end_positions, [r[0], end_col])
+        else
+            " No paste, stay at current position
+            call add(end_positions, [r[0], r[1]])
+        endif
+    endfor
+
+    " Now create regions at the calculated end positions
+    for pos in end_positions
+        call cursor(pos[0], pos[1])
+        " Try to get existing region at this position first
+        let R = s:G.region_at_pos()
+        if empty(R)
+            " Create cursor region with explicit position to avoid mark issues
+            " vm#region#new expects (cursor, line_start, line_end, col_start, col_end)
+            " For a cursor: all positions are the same
+            let R = vm#region#new(0, pos[0], pos[0], pos[1], pos[1])
+            call R.update_content()
+            call s:F.restore_reg()
+        endif
+    endfor
+
+    call s:V.Maps.enable()
+    call s:G.check_mutliline(1)
+
+    nmap <silent><nowait><buffer> c <Plug>(VM-c)
+
+    if empty(s:v.search) | let @/ = '' | endif
+    call s:old_updatetime()
+
+    " Exit extend mode to cursor mode
+    let g:Vm.extend_mode = 0
+endfun
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Find operator
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
