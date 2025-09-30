@@ -286,10 +286,18 @@ fun! vm#commands#find_under(visual, whole, ...) abort
     if a:0 && s:is_r() | return vm#commands#find_next(0, 0) | endif
 
     " yank and create region
-    if !a:visual | call vm#highlightedyank#execute_silent('normal! viwy`]') | endif
+    if !a:visual
+        call vm#highlightedyank#execute_silent('normal! viwy`]')
+    endif
 
     "replace region if calling the command on an existing region
     if s:is_r() | call s:G.region_at_pos().remove() | endif
+
+    " Disable auto-exit BEFORE creating first region to prevent premature exit
+    " Will be re-enabled after smart initialization completes
+    if !a:visual
+        let b:VM_disable_auto_exit = 1
+    endif
 
     call s:Search.add()
     let R = s:G.new_region()
@@ -297,21 +305,20 @@ fun! vm#commands#find_under(visual, whole, ...) abort
 
     " Smart initialization: if there are more matches available, add the next one too
     " This prevents auto-exit from triggering inappropriately during multi-match scenarios
+    " Only do this for non-visual mode (in visual mode, find_all will handle creating all regions)
     if !a:visual && len(s:V.Regions) == 1
         " Save current position and search state
         let save_pos = getpos('.')
         let orig_search = @/
 
-        " Temporarily disable auto-exit during smart initialization
-        let b:VM_disable_auto_exit = 1
-
         " Try to find next match and create region directly (without using find_next)
         try
-            let next_pos = search(@/, 'Wn')
-            if next_pos > 0
+            let next_pos = searchpos(@/, 'Wn')
+            if next_pos[0] > 0
                 " Found another match - create region directly at this position
-                call cursor(next_pos, 1)
-                call vm#highlightedyank#execute_silent('silent keepjumps normal! ngny`]')
+                call cursor(next_pos[0], next_pos[1])
+                " Yank the word at cursor, same as the first region
+                call vm#highlightedyank#execute_silent('normal! viwy')
                 call s:G.new_region()
                 " Make the newly created region at current cursor position active
                 call s:G.select_region_at_pos('.')
@@ -326,6 +333,9 @@ fun! vm#commands#find_under(visual, whole, ...) abort
             " Don't restore cursor position - leave it at the last region
             " call setpos('.', save_pos)
         endtry
+    else
+        " Re-enable auto-exit for visual mode or when we already have multiple regions
+        unlet! b:VM_disable_auto_exit
     endif
 
     return (a:0 && a:visual)? s:G.region_at_pos() : s:G.merge_overlapping(R)
