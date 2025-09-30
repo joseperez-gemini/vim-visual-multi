@@ -929,11 +929,15 @@ endfun
 fun! vm#commands#visual_find_smart() abort
     " Smart visual find called from visual mode.
     " - Character-wise (v): yank selection and do incremental find
-    " - Linewise (V) and blockwise (Ctrl-v): use last search pattern on selected lines
+    " - Linewise (V): use last search pattern on selected lines
+    " - Blockwise (Ctrl-v): use last search pattern within block boundaries
     let vmode = visualmode()
-    if vmode ==# 'V' || vmode ==# "\<C-v>"
-        " Linewise or blockwise
+    if vmode ==# 'V'
+        " Linewise
         call vm#commands#visual_cursors_smart_linewise()
+    elseif vmode ==# "\<C-v>"
+        " Blockwise - use find_in_selection to respect column boundaries
+        call vm#commands#visual_find_in_selection()
     else
         " Character-wise: yank the selection, then call find_under with smart init enabled
         call vm#highlightedyank#execute_silent('normal! gvy')

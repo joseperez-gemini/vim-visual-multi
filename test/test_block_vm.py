@@ -112,9 +112,8 @@ def setup_nvim():
 
     # Setup <M-n> mapping for Find Under
     nv.command("nmap <M-n> <Plug>(VM-Find-Under)")
-    # For visual mode, yank the selection first, then call find_all
-    # Yank to default register so find_under can access it
-    nv.command("xnoremap <silent> <M-n> y:<C-u>call vm#commands#find_all(1, 0)<CR>")
+    # For visual mode, find within selection (respects block boundaries)
+    nv.command("xnoremap <silent> <M-n> :<C-u>call vm#visual#find_in_selection()<CR>")
 
     return nv, proc, sock_path
 
@@ -590,6 +589,83 @@ def test_search_forward_multiline(nv):
     return all(result for result, _ in test_results), test_results
 
 
+def test_search_forward_multiline_block_visual(nv):
+    """Test that <M-n> in block visual mode only finds matches within block bounds."""
+    # Source required autoload files
+    nv.command("source autoload/vm/visual.vim")
+    nv.command("source autoload/vm/commands.vim")
+
+    # Use the same mapping as the user's config (visual_find_smart)
+    nv.command(
+        "xnoremap <silent><buffer> <M-n> :<C-u>call vm#commands#visual_find_smart()<CR>"
+    )
+
+    nv.current.buffer[:] = [
+        "line1 item cccc target item item",
+        "line2 item cccc item target item",
+        "line3 aaaa cccc item target item",
+        "line4 item cccc item item item",
+        "line5 bbbb cccc item item item",
+    ]
+
+    # First, set the search pattern to "item"
+    nv.command("normal! gg")
+    nv.input("/item<CR>")
+    time.sleep(0.1)
+
+    # Block visual selection covering (cols 11-27, 17 chars wide):
+    # Line 1: "cccc target item " - contains "target" and "item"
+    # Line 2: "cccc item target " - contains "item" and "target"
+    # Line 3: "cccc item target " - contains "item" and "target"
+    # Line 4: "cccc item item it" - contains "item" twice, "it" is partial
+    # Line 5 is NOT in selection
+    nv.command("normal! gg010l")  # Move to col 11 (first 'c' in cccc)
+    nv.input("<C-v>16l3j")  # Block select 17 chars wide, 4 lines
+
+    # Use <M-n> to find all "item" within the block
+    nv.input("<M-n>")
+    wait_for_vm_active(nv)
+
+    regions = wait_for_regions(nv, 5)  # Expect 5 complete "item" matches
+
+    # Expected matches FULLY within block (cols 11-27):
+    # Buffer:          line1 item cccc target item item
+    # Columns (1-idx): 1234567890123456789012345678901
+    #                            1111111111222222222233
+    # Block covers:              ^cccc target item ^
+    #                            col 11         col 27
+    # Line 1: "item" at cols 24-27 (fully within block)
+    # Line 2: "item" at cols 17-20 (fully within block)
+    # Line 3: "item" at cols 17-20 (fully within block)
+    # Line 4: "item" at cols 17-20 (first, fully within)
+    # Line 4: "item" at cols 22-25 (second, fully within)
+    # Line 4: "item" at cols 27-30 - EXTENDS PAST col 27! Should NOT match
+    # Line 5 should NOT have matches (outside block)
+    positions = sorted([(r["l"], r["a"], r["b"]) for r in regions])
+
+    test_results = [
+        (
+            len(regions) == 5,
+            f"Expected 5 regions (complete 'item' fully within block), got {len(regions)}",
+        ),
+        (
+            positions
+            == [(1, 24, 27), (2, 17, 20), (3, 17, 20), (4, 17, 20), (4, 22, 25)],
+            f"Expected matches at [(1, 24, 27), (2, 17, 20), (3, 17, 20), "
+            f"(4, 17, 20), (4, 22, 25)], got {positions}",
+        ),
+        (
+            all(r["l"] <= 4 for r in regions),
+            f"Expected all regions on lines 1-4 only (not line 5), "
+            f"got regions on lines {[r['l'] for r in regions]}",
+        ),
+    ]
+
+    nv.command("call vm#reset()")
+    wait_for_vm_inactive(nv)
+    return all(result for result, _ in test_results), test_results
+
+
 def test_substitute_motion_with_multicursor(nv):
     """Test that VM-native substitute operator 'se' works with multiple cursors."""
     # Source required autoload files and register buffer plugs
@@ -855,6 +931,11 @@ def main():
                 1,
             ),
             ("Search forward multiline", test_search_forward_multiline, 1),
+            (
+                "Search forward multiline block visual",
+                test_search_forward_multiline_block_visual,
+                1,
+            ),
         ]
 
         all_results = []

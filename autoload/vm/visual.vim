@@ -132,6 +132,11 @@ fun! vm#visual#find_in_selection() abort
     " Get visual mode first (before any initialization)
     let mode = visualmode()
 
+    " Initialize VM if not already active
+    if !get(get(g:, 'Vm', {}), 'buffer', 0)
+        call vm#init_buffer(0)
+    endif
+
     call s:init()
 
     " Get the current search pattern - use oldsearch backup if @/ is empty
@@ -181,9 +186,10 @@ fun! vm#visual#find_in_selection() abort
                 " For line-wise or character-wise, just check line boundaries
                 call s:G.new_region()
             elseif mode == "\<C-v>"
-                " For block-wise, also check column boundaries
-                let match_col = getpos("'[")[2]
-                if match_col >= startcol && match_col <= endcol
+                " For block-wise, check that BOTH start and end are within column boundaries
+                let match_start_col = getpos("'[")[2]
+                let match_end_col = getpos("']")[2]
+                if match_start_col >= startcol && match_end_col <= endcol
                     call s:G.new_region()
                 endif
             endif
@@ -204,8 +210,10 @@ fun! vm#visual#find_in_selection() abort
             if mode ==# 'V' || (mode ==# 'v')
                 call s:G.new_region()
             elseif mode == "\<C-v>"
-                let match_col = getpos("'[")[2]
-                if match_col >= startcol && match_col <= endcol
+                " For block-wise, check that BOTH start and end are within column boundaries
+                let match_start_col = getpos("'[")[2]
+                let match_end_col = getpos("']")[2]
+                if match_start_col >= startcol && match_end_col <= endcol
                     call s:G.new_region()
                 endif
             endif
