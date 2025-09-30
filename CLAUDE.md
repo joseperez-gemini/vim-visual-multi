@@ -1,24 +1,13 @@
 # Claude Development Guidelines
 
-## Testing
+## Quick Commands
 
-Run the test suite:
 ```bash
-nix develop --command python test/test_block_vm.py
-```
-
-## Code Quality
-
-Run all linters and formatters before committing:
-```bash
-# 1. Format code
-nix develop --command black test/test_block_vm.py
-
-# 2. Type checking (should show 0 errors)
-nix develop --command pyright test/test_block_vm.py
-
-# 3. Linting (should be 10.0/10)
-nix develop --command pylint test/test_block_vm.py
+make format      # Format code with black
+make typecheck   # Type check with pyright (should show 0 errors)
+make lint        # Lint with pylint (should be 10.0/10)
+make test        # Run test suite
+make all         # Run all checks
 ```
 
 ## Test Coverage
