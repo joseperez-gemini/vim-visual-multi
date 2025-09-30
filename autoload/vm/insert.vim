@@ -122,6 +122,7 @@ fun! s:Insert.start(...) abort
     let I.change    = 0         " text change, only if g:VM_live_editing
     let I.col       = col('.')
     let I.reupdate  = v:false   " set by InsertCharPre and CompleteDone
+    let I.undojoin_count = 0    " track consecutive updates for undojoin
 
     " remove current regions highlight
     call s:G.remove_highlight()
@@ -229,6 +230,12 @@ fun! s:Insert.update_text(insert_leave) abort
     " Update the text on TextChangedI event, and just after InsertLeave.
 
     if s:F.not_VM() || !g:VM_live_editing && !a:insert_leave | return | endif
+
+    " Use undojoin for consecutive text changes (except the first)
+    if self.undojoin_count > 0
+        silent! undojoin
+    endif
+    let self.undojoin_count += 1
 
     call vm#comp#TextChangedI()  "compatibility tweaks
 
@@ -355,6 +362,7 @@ fun! s:Insert.stop(...) abort
     let s:v.insert = 0
     silent! unlet s:v.bs_count
     silent! unlet s:v.last_icmd
+    let self.undojoin_count = 0
 
     call s:step_back()
     call s:V.Edit.post_process(0,0)
@@ -524,6 +532,7 @@ fun! s:Line.update(change, text) abort
         " c._a is the updated cursor position, c.a stays the same
         if c.active | let I.col = c._a | endif
     endfor
+
     call setline(self.l, text)
 endfun
 
@@ -563,11 +572,20 @@ fun! s:Insert.auto_start() abort
     " Initialize autocommands.
     augroup VM_insert
         au!
+        au InsertCharPre <buffer> call s:Insert_char_pre()
         au TextChangedI  <buffer> call b:VM_Selection.Insert.update_text(0)
         au InsertLeave   <buffer> call b:VM_Selection.Insert.stop()
-        au InsertCharPre <buffer> let b:VM_Selection.Insert.reupdate = v:true
         au CompleteDone  <buffer> let b:VM_Selection.Insert.reupdate = v:true
     augroup END
+endfun
+
+fun! s:Insert_char_pre() abort
+    " Called before each character is inserted
+    let b:VM_Selection.Insert.reupdate = v:true
+    " Use undojoin to join the next change with previous undo block
+    if b:VM_Selection.Insert.undojoin_count > 0
+        silent! undojoin
+    endif
 endfun
 
 

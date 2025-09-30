@@ -15,4 +15,3 @@ hello
 ```
 
 - Allow \A for visual mode (highlight `test test` above and do \A)
-- Undo for inserting ` word` at end of line splits undo for `word` and ` `
