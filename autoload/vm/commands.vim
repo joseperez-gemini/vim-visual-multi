@@ -214,7 +214,10 @@ fun! vm#commands#regex_done() abort
         else
             let s:v.direction = 1  " forward
         endif
+        " Mark that we're doing a slash search (not Goto Regex)
+        let s:v.slash_search = 1
         call vm#commands#regex_motion(@/, 1, 0)
+        let s:v.slash_search = 0
         return
 
     elseif s:X() | call vm#highlightedyank#execute_silent('silent keepjumps normal! gny`]')
@@ -650,12 +653,16 @@ fun! vm#commands#regex_motion(regex, count, remove) abort
     if s:v.direction
         for r in ( s:v.single_region ? [R] : s:R() )
             call cursor(r.L, r.b)
-            let endl = s:v.multiline && !empty(a:regex) ? line('$') : r.L
+            " When using slash search, always search multiline
+            let is_slash = get(s:v, 'slash_search', 0)
+            let endl = is_slash ? line('$') : (s:v.multiline && !empty(a:regex) ? line('$') : r.L)
             if !search(regex . case, 'z', endl)
                 if a:remove | call r.remove() | endif
                 continue
             endif
             if X
+                " In extend mode, update both start (l,a) and end (L,b) positions
+                let [r.l, r.a] = getpos('.')[1:2]
                 let [r.L, r.b] = getpos('.')[1:2]
                 call r.update_region()
             else
@@ -665,13 +672,17 @@ fun! vm#commands#regex_motion(regex, count, remove) abort
     else
         for r in ( s:v.single_region ? [R] : s:R() )
             call cursor(r.L, r.b)
-            let startl = s:v.multiline && !empty(a:regex) ? 1 : r.l
+            " When using slash search, always search multiline
+            let is_slash = get(s:v, 'slash_search', 0)
+            let startl = is_slash ? 1 : (s:v.multiline && !empty(a:regex) ? 1 : r.l)
             if !search(regex . case, 'b', startl)
                 if a:remove | call r.remove() | endif
                 continue
             endif
             if X
+                " In extend mode, update both start (l,a) and end (L,b) positions
                 let [r.l, r.a] = getpos('.')[1:2]
+                let [r.L, r.b] = getpos('.')[1:2]
                 call r.update_region()
             else
                 call r.update_cursor_pos()
@@ -689,7 +700,9 @@ fun! vm#commands#regex_motion(regex, count, remove) abort
     endif
 
     " update variables, facing direction, highlighting
-    call s:after_move(R)
+    " Pass the current region after the move, not the old one
+    let R_current = s:R()[ s:v.index ]
+    call s:after_move(R_current)
 endfun
 
 

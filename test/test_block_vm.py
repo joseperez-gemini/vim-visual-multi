@@ -854,8 +854,7 @@ def main():
                 test_substitute_motion_with_multicursor,
                 1,
             ),
-            # TODO: Fix multiline search - currently searches only on current line  # pylint: disable=fixme
-            # ("Search forward multiline", test_search_forward_multiline, 1),
+            ("Search forward multiline", test_search_forward_multiline, 1),
         ]
 
         all_results = []
