@@ -295,9 +295,7 @@ fun! vm#commands#find_under(visual, whole, ...) abort
 
     " Disable auto-exit BEFORE creating first region to prevent premature exit
     " Will be re-enabled after smart initialization completes
-    if !a:visual
-        let b:VM_disable_auto_exit = 1
-    endif
+    let b:VM_disable_auto_exit = 1
 
     call s:Search.add()
     let R = s:G.new_region()
@@ -305,8 +303,9 @@ fun! vm#commands#find_under(visual, whole, ...) abort
 
     " Smart initialization: if there are more matches available, add the next one too
     " This prevents auto-exit from triggering inappropriately during multi-match scenarios
-    " Only do this for non-visual mode (in visual mode, find_all will handle creating all regions)
-    if !a:visual && len(s:V.Regions) == 1
+    " Enable smart init for non-visual mode OR when explicitly requested via optional arg
+    let enable_smart_init = !a:visual || (a:0 && a:1)
+    if enable_smart_init && len(s:V.Regions) == 1
         " Save current position and search state
         let save_pos = getpos('.')
         let orig_search = @/
@@ -317,8 +316,8 @@ fun! vm#commands#find_under(visual, whole, ...) abort
             if next_pos[0] > 0
                 " Found another match - create region directly at this position
                 call cursor(next_pos[0], next_pos[1])
-                " Yank the word at cursor, same as the first region
-                call vm#highlightedyank#execute_silent('normal! viwy')
+                " Use gn to select the next match (which is the one we just found)
+                call vm#highlightedyank#execute_silent('normal! gny`]')
                 call s:G.new_region()
                 " Make the newly created region at current cursor position active
                 call s:G.select_region_at_pos('.')
@@ -333,9 +332,6 @@ fun! vm#commands#find_under(visual, whole, ...) abort
             " Don't restore cursor position - leave it at the last region
             " call setpos('.', save_pos)
         endtry
-    else
-        " Re-enable auto-exit for visual mode or when we already have multiple regions
-        unlet! b:VM_disable_auto_exit
     endif
 
     return (a:0 && a:visual)? s:G.region_at_pos() : s:G.merge_overlapping(R)
@@ -360,7 +356,7 @@ fun! vm#commands#find_all(visual, whole) abort
             " Create a dummy region to trigger the search
             call cursor(pos[0], pos[1])
             if search(search_pat, 'c')
-                silent keepjumps normal! ygn
+                call vm#highlightedyank#execute_silent('silent keepjumps normal! ygn')
                 let R = s:G.new_region()
             else
                 " No match found, fall back to word under cursor
@@ -914,6 +910,73 @@ fun! vm#commands#visual_find_in_selection() abort
     " Find search pattern matches within visual selection.
     call s:set_extend_mode(1)
     call vm#visual#find_in_selection()
+endfun
+
+
+fun! vm#commands#visual_find_smart() abort
+    " Smart visual find called from visual mode.
+    " - Character-wise (v): yank selection and do incremental find
+    " - Linewise (V) and blockwise (Ctrl-v): use last search pattern on selected lines
+    let vmode = visualmode()
+    if vmode ==# 'V' || vmode ==# "\<C-v>"
+        " Linewise or blockwise
+        call vm#commands#visual_cursors_smart_linewise()
+    else
+        " Character-wise: yank the selection, then call find_under with smart init enabled
+        call vm#highlightedyank#execute_silent('normal! gvy')
+        call vm#commands#find_under(1, 0, 1)
+    endif
+endfun
+
+
+fun! vm#commands#visual_cursors_smart_linewise() abort
+    " Smart linewise visual find: creates cursors on selected lines at search pattern matches.
+    " Used when <M-n> is pressed in linewise visual mode with a search pattern set.
+    let b:VM_disable_auto_exit = 1
+    try
+        " Get the line range from the visual selection
+        let [start_line, end_line] = [line("'<"), line("'>")]
+
+        " Initialize VM
+        call s:init(0, 0, 1)
+
+        " Get current search pattern (should be set by previous / search)
+        let pattern = @/
+        if empty(pattern)
+            echo "No search pattern set"
+            return
+        endif
+
+        " Search for pattern on each selected line and create regions
+        for lnum in range(start_line, end_line)
+            " Get the text of the current line
+            let line_text = getline(lnum)
+            " Find all matches on this line using matchstrpos()
+            let start_col = 0
+            while 1
+                let [match_text, match_start, match_end] = matchstrpos(line_text, pattern, start_col)
+                if match_start < 0
+                    break
+                endif
+                " Found match on this line (match_start is 0-indexed)
+                " Move to the match position (match_start+1 for 1-indexed)
+                call cursor(lnum, match_start + 1)
+                " Use gn to select the next match (which is the one we just found)
+                call vm#highlightedyank#execute_silent('normal! gny`]')
+                call s:Search.add()
+                call s:G.new_region()
+                " Move to next position after this match
+                let start_col = match_end
+            endwhile
+        endfor
+
+        " Update selection
+        if len(s:R()) > 0
+            call s:G.update_and_select_region({'index': 0})
+        endif
+    finally
+        unlet! b:VM_disable_auto_exit
+    endtry
 endfun
 
 

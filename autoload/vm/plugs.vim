@@ -25,6 +25,7 @@ fun! vm#plugs#permanent() abort
 
   nnoremap <silent>       <Plug>(VM-Find-Under)              :<c-u>call vm#commands#ctrln(v:count1)<cr>
   xnoremap <silent><expr> <Plug>(VM-Find-Subword-Under)      <sid>Visual('under')
+  xnoremap <silent>       <Plug>(VM-Visual-Find-Smart)       :<c-u>call vm#commands#visual_find_smart()<cr>
 
   nnoremap <silent>       <Plug>(VM-Start-Regex-Search)      @=vm#commands#find_by_regex(1)<cr>
   nnoremap <silent>       <Plug>(VM-Slash-Search)            @=vm#commands#find_by_regex(3)<cr>
@@ -421,6 +422,8 @@ fun! s:Yank() abort
 endfun
 
 
+
+
 fun! s:Visual(cmd) abort
   " Restore register after a visual yank.
   if !g:Vm.buffer
@@ -434,6 +437,7 @@ fun! s:Visual(cmd) abort
   else
     let r = ''
   endif
+
   return a:cmd == 'all'
         \ ? "y:call vm#commands#find_all(1, 0)\<cr>".r."`]"
         \ : "y:call vm#commands#find_under(1, 0)\<cr>".r."`]"
